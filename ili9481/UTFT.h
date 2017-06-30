@@ -74,6 +74,7 @@ class UTFT {
         void setColor(color_t color);
         void setBackColor(byte r, byte g, byte b);
         void setBackColor(color_t color);
+        void printChar(byte c, int x, int y);
         void print(char *st, int x, int y);
         void print(String st, int x, int y);
         void setFont(uint8_t* font);
@@ -94,7 +95,6 @@ class UTFT {
         void setPixel(color_t color);
         void drawHLine(int x, int y, int l);
         void drawVLine(int x, int y, int l);
-        void printChar(byte c, int x, int y);
         void setXY(word x1, word y1, word x2, word y2);
         void clrXY();
 };
