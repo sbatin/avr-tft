@@ -8,15 +8,15 @@ inline void write_data(char high, char low) {
     PORTB = low & 0x3F;
 }
 
-void UTFT::LCD_Writ_Bus(char VH, char VL) {
+void UTFT::LCD_Write_Bus(char VH, char VL) {
     write_data(VH, VL);
     pulse_low(P_WR, B_WR);
 }
 
-void UTFT::_fast_fill_16(char ch, char cl, long pix) {
+void UTFT::LCD_Fast_Fill_16(color_t color, long pix) {
     long blocks = pix / 16;
 
-    write_data(ch, cl);
+    write_data(color >> 8, color & 0xFF);
 
     for (int i = 0; i < blocks; i++) {
         pulse_low(P_WR, B_WR);
@@ -58,17 +58,33 @@ UTFT::UTFT(int RS, int WR, int CS, int RST) {
 
 void UTFT::LCD_Write_COM(char VL) {
     cbi(P_RS, B_RS);
-    LCD_Writ_Bus(0x00, VL);
+    LCD_Write_Bus(0x00, VL);
 }
 
 void UTFT::LCD_Write_DATA(char VH, char VL) {
     sbi(P_RS, B_RS);
-    LCD_Writ_Bus(VH, VL);
+    LCD_Write_Bus(VH, VL);
 }
 
 void UTFT::LCD_Write_DATA(char VL) {
     sbi(P_RS, B_RS);
-    LCD_Writ_Bus(0x00, VL);
+    LCD_Write_Bus(0x00, VL);
+}
+
+inline void UTFT::LCD_SetColumnAddress(word x1, word x2) {
+    LCD_Write_COM(0x2A);
+    LCD_Write_DATA(x1 >> 8);
+    LCD_Write_DATA(x1);
+    LCD_Write_DATA(x2 >> 8);
+    LCD_Write_DATA(x2);
+}
+
+inline void UTFT::LCD_SetPageAddress(word y1, word y2) {
+    LCD_Write_COM(0x2B);
+    LCD_Write_DATA(y1 >> 8);
+    LCD_Write_DATA(y1);
+    LCD_Write_DATA(y2 >> 8);
+    LCD_Write_DATA(y2);
 }
 
 void UTFT::InitLCD(byte orientation) {
@@ -113,6 +129,7 @@ void UTFT::InitLCD(byte orientation) {
     LCD_Write_DATA(0x11);
 
     // frame rate and inversion control
+    // set 72Hz frame rate
     LCD_Write_COM(0xC5);
     LCD_Write_DATA(0x03);
 
@@ -161,7 +178,7 @@ void UTFT::InitLCD(byte orientation) {
 
     setColor(255, 255, 255);
     setBackColor(0, 0, 0);
-    cfont.font=0;
+    cfont.font = 0;
 }
 
 void UTFT::setXY(word x1, word y1, word x2, word y2) {
@@ -173,17 +190,9 @@ void UTFT::setXY(word x1, word y1, word x2, word y2) {
         swap(word, y1, y2);
     }
 
-    LCD_Write_COM(0x2a);
-    LCD_Write_DATA(x1 >> 8);
-    LCD_Write_DATA(x1);
-    LCD_Write_DATA(x2 >> 8);
-    LCD_Write_DATA(x2);
-    LCD_Write_COM(0x2b);
-    LCD_Write_DATA(y1 >> 8);
-    LCD_Write_DATA(y1);
-    LCD_Write_DATA(y2 >> 8);
-    LCD_Write_DATA(y2);
-    LCD_Write_COM(0x2c);
+    LCD_SetColumnAddress(x1, x2);
+    LCD_SetPageAddress(y1, y2);
+    LCD_Write_COM(0x2C);
 }
 
 void UTFT::clrXY() {
@@ -220,7 +229,7 @@ void UTFT::fillRect(int x1, int y1, int x2, int y2) {
     cbi(P_CS, B_CS);
     setXY(x1, y1, x2, y2);
     sbi(P_RS, B_RS);
-    _fast_fill_16(fch, fcl, (long(x2 - x1) + 1) * (long(y2 - y1) + 1));
+    LCD_Fast_Fill_16(fore_color, (long(x2 - x1) + 1) * (long(y2 - y1) + 1));
     sbi(P_CS, B_CS);
 }
 
@@ -228,54 +237,47 @@ void UTFT::clrScr() {
     cbi(P_CS, B_CS);
     clrXY();
     sbi(P_RS, B_RS);
-    _fast_fill_16(0, 0, (disp_x_size + 1) * (disp_y_size + 1));
+    LCD_Fast_Fill_16(0, (disp_x_size + 1) * (disp_y_size + 1));
     sbi(P_CS, B_CS);
 }
 
 void UTFT::fillScr(byte r, byte g, byte b) {
-    word color = ((r & 248) << 8 | (g & 252) << 3 | (b & 248) >> 3);
+    color_t color = from_rgb(r, g, b);
     fillScr(color);
 }
 
-void UTFT::fillScr(word color) {
-    char ch = byte(color >> 8);
-    char cl = byte(color & 0xFF);
-
+void UTFT::fillScr(color_t color) {
     cbi(P_CS, B_CS);
     clrXY();
     sbi(P_RS, B_RS);
-    _fast_fill_16(ch, cl, (disp_x_size + 1) * (disp_y_size + 1));
+    LCD_Fast_Fill_16(color, (disp_x_size + 1) * (disp_y_size + 1));
     sbi(P_CS, B_CS);
 }
 
 void UTFT::setColor(byte r, byte g, byte b) {
-    fch = (r & 248) | g >> 5;
-    fcl = (g & 28) << 3 | b >> 3;
+    fore_color = from_rgb(r, g, b);
 }
 
-void UTFT::setColor(word color) {
-    fch = byte(color >> 8);
-    fcl = byte(color & 0xFF);
+void UTFT::setColor(color_t color) {
+    fore_color = color;
 }
 
 void UTFT::setBackColor(byte r, byte g, byte b) {
-    bch = (r & 248) | g >> 5;
-    bcl = (g & 28) << 3| b >> 3;
+    back_color = from_rgb(r, g, b);
 }
 
-void UTFT::setBackColor(uint32_t color) {
-    bch=byte(color >> 8);
-    bcl=byte(color & 0xFF);
+void UTFT::setBackColor(color_t color) {
+    back_color = color;
 }
 
-void UTFT::setPixel(word color) {
+void UTFT::setPixel(color_t color) {
     LCD_Write_DATA(color >> 8, color & 0xFF); // rrrrrggggggbbbbb
 }
 
 void UTFT::drawPixel(int x, int y) {
     cbi(P_CS, B_CS);
     setXY(x, y, x, y);
-    setPixel((fch << 8) | fcl);
+    setPixel(fore_color);
     sbi(P_CS, B_CS);
     clrXY();
 }
@@ -296,8 +298,8 @@ void UTFT::drawLine(int x1, int y1, int x2, int y2) {
 		if (dx < dy) {
 			int t = - (dy >> 1);
 			while (true) {
-				setXY (col, row, col, row);
-				LCD_Write_DATA(fch, fcl);
+				setXY(col, row, col, row);
+				setPixel(fore_color);
 				if (row == y2)
 					return;
 				row += ystep;
@@ -310,8 +312,8 @@ void UTFT::drawLine(int x1, int y1, int x2, int y2) {
 		} else {
 			int t = - (dx >> 1);
 			while (true) {
-				setXY (col, row, col, row);
-				LCD_Write_DATA(fch, fcl);
+				setXY(col, row, col, row);
+				setPixel(fore_color);
 				if (col == x2)
 					return;
 				col += xstep;
@@ -336,7 +338,7 @@ void UTFT::drawHLine(int x, int y, int l) {
     cbi(P_CS, B_CS);
     setXY(x, y, x + l, y);
     sbi(P_RS, B_RS);
-    _fast_fill_16(fch, fcl, l);
+    LCD_Fast_Fill_16(fore_color, l);
     sbi(P_CS, B_CS);
     clrXY();
 }
@@ -350,7 +352,7 @@ void UTFT::drawVLine(int x, int y, int l) {
     cbi(P_CS, B_CS);
     setXY(x, y, x, y + l);
     sbi(P_RS, B_RS);
-    _fast_fill_16(fch, fcl, l);
+    LCD_Fast_Fill_16(fore_color, l);
     sbi(P_CS, B_CS);
     clrXY();
 }
@@ -367,13 +369,13 @@ void UTFT::printChar(byte c, int x, int y) {
     pos = 4 + (c - cfont.offset) * n;
 
     for (j = 0; j < n; j++) {
-        ch = pgm_read_byte(&cfont.font[pos]);
+        ch = fontbyte(pos);
 
         for (i = 0; i < 8; i++) {
             if ((ch & (1 << (7 - i))) != 0) {
-                setPixel((fch << 8) | fcl);
+                setPixel(fore_color);
             } else {
-                setPixel((bch << 8) | bcl);
+                setPixel(back_color);
             }
         }
         pos++;
@@ -382,36 +384,6 @@ void UTFT::printChar(byte c, int x, int y) {
     sbi(P_CS, B_CS);
     clrXY();
 }
-
-/*void UTFT::printChar(byte c, int x, int y) {
-    byte i,ch;
-    word j;
-    word temp;
-
-    cbi(P_CS, B_CS);
-
-    if (orient==LANDSCAPE) {
-        temp=((c-cfont.offset)*((cfont.x_size/8)*cfont.y_size))+4;
-
-        for(j=0;j<((cfont.x_size/8)*cfont.y_size);j+=(cfont.x_size/8)) {
-            setXY(x,y+(j/(cfont.x_size/8)),x+cfont.x_size-1,y+(j/(cfont.x_size/8)));
-            for (int zz=(cfont.x_size/8)-1; zz>=0; zz--) {
-                ch=pgm_read_byte(&cfont.font[temp+zz]);
-                for(i=0;i<8;i++) {
-                    if((ch&(1<<i))!=0) {
-                        setPixel((fch<<8)|fcl);
-                    } else {
-                        setPixel((bch<<8)|bcl);
-                    }
-                }
-            }
-            temp+=(cfont.x_size/8);
-        }
-    }
-
-    sbi(P_CS, B_CS);
-    clrXY();
-}*/
 
 void UTFT::print(char *st, int x, int y) {
     int stl, i;

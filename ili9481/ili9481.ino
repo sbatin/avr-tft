@@ -54,7 +54,7 @@ void loop() {
   myGLCD.setColor(VGA_WHITE);
   myGLCD.setBackColor(VGA_SILVER);
   for (int i = 113; i < 226; i++) {
-    myGLCD.print(String(i),10,360);
+    myGLCD.print(String(i),x1+20,360);
     delay(100);
   }
 

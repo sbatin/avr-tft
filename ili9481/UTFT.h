@@ -47,51 +47,56 @@
 #define swap(type, i, j) {type t = i; i = j; j = t;}
 
 #define fontbyte(x) pgm_read_byte(&cfont.font[x])
+#define from_rgb(r, g, b) ((r & 248) << 8 | (g & 252) << 3 | (b & 248) >> 3)
 
-struct _current_font {
-	uint8_t* font;
-	uint8_t x_size;
-	uint8_t y_size;
-	uint8_t offset;
-	uint8_t numchars;
+typedef uint16_t color_t;
+
+struct font_t {
+    uint8_t* font;
+    uint8_t x_size;
+    uint8_t y_size;
+    uint8_t offset;
+    uint8_t numchars;
 };
 
 class UTFT {
-	public:
-		UTFT(int RS, int WR, int CS, int RST);
-		void InitLCD(byte orientation=LANDSCAPE);
-		void clrScr();
-		void drawPixel(int x, int y);
-		void drawLine(int x1, int y1, int x2, int y2);
-		void fillScr(byte r, byte g, byte b);
-		void fillScr(word color);
-		void drawRect(int x1, int y1, int x2, int y2);
-		void fillRect(int x1, int y1, int x2, int y2);
-		void setColor(byte r, byte g, byte b);
-		void setColor(word color);
-		void setBackColor(byte r, byte g, byte b);
-		void setBackColor(uint32_t color);
-		void print(char *st, int x, int y);
-		void print(String st, int x, int y);
-		void setFont(uint8_t* font);
+    public:
+        UTFT(int RS, int WR, int CS, int RST);
+        void InitLCD(byte orientation=LANDSCAPE);
+        void clrScr();
+        void drawPixel(int x, int y);
+        void drawLine(int x1, int y1, int x2, int y2);
+        void fillScr(byte r, byte g, byte b);
+        void fillScr(color_t color);
+        void drawRect(int x1, int y1, int x2, int y2);
+        void fillRect(int x1, int y1, int x2, int y2);
+        void setColor(byte r, byte g, byte b);
+        void setColor(color_t color);
+        void setBackColor(byte r, byte g, byte b);
+        void setBackColor(color_t color);
+        void print(char *st, int x, int y);
+        void print(String st, int x, int y);
+        void setFont(uint8_t* font);
 
-        private:
-		byte		fch, fcl, bch, bcl;
-		byte		orient;
-		long		disp_x_size, disp_y_size;
-		_current_font	cfont;
+    private:
+        color_t fore_color, back_color;
+        byte orient;
+        long disp_x_size, disp_y_size;
+        font_t cfont;
 
-		void LCD_Writ_Bus(char VH, char VL);
-		void LCD_Write_COM(char VL);
-		void LCD_Write_DATA(char VH, char VL);
-		void LCD_Write_DATA(char VL);
-		void setPixel(word color);
-		void drawHLine(int x, int y, int l);
-		void drawVLine(int x, int y, int l);
-		void printChar(byte c, int x, int y);
-		void setXY(word x1, word y1, word x2, word y2);
-		void clrXY();
-		void _fast_fill_16(char ch, char cl, long pix);
+        void LCD_Write_Bus(char VH, char VL);
+        void LCD_Write_COM(char VL);
+        void LCD_Write_DATA(char VH, char VL);
+        void LCD_Write_DATA(char VL);
+        void LCD_Fast_Fill_16(color_t color, long pix);
+        void LCD_SetColumnAddress(word x1, word x2);
+        void LCD_SetPageAddress(word y1, word y2);
+        void setPixel(color_t color);
+        void drawHLine(int x, int y, int l);
+        void drawVLine(int x, int y, int l);
+        void printChar(byte c, int x, int y);
+        void setXY(word x1, word y1, word x2, word y2);
+        void clrXY();
 };
 
 #endif
