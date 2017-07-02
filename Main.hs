@@ -15,10 +15,33 @@ import Text.Printf
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Unsafe as BSU
 
-type FontData = BS.ByteString
+{-
+*******************************************************************************
+***************************** generic BMP API *********************************
+*******************************************************************************
+-}
 
-stringify :: FontData -> String
-stringify = intercalate "," . map (printf "0x%02X") . BS.unpack
+type RGBA = ((Int, Int), BS.ByteString)
+type Pixel = (Word8, Word8, Word8)
+
+loadData :: FilePath -> IO RGBA
+loadData filePath = do
+    Right bmp <- readBMP filePath
+    return (bmpDimensions bmp, unpackBMPToRGBA32 bmp)
+
+getPixel :: (Int, Int) -> RGBA -> Pixel
+getPixel (x, y) ((w, h), rgba) = (r, g, b) where
+    start = (x + (pred h - y) * w) * 4
+
+    [r, g, b] = take 3 $ map (BSU.unsafeIndex rgba) [start..]
+
+{-
+*******************************************************************************
+*************************** font rendering API ********************************
+*******************************************************************************
+-}
+
+type FontData = BS.ByteString
 
 renderSymbol :: Char -> FontData -> IO ()
 renderSymbol ch font = do
@@ -44,36 +67,28 @@ renderSymbol ch font = do
 
         line = "+" ++ replicate w '-' ++ "+"
 
-type RGBA = ((Int, Int), BS.ByteString)
-type Pixel = (Word8, Word8, Word8)
 type Cell = [[Bool]]
-
-loadData :: FilePath -> IO RGBA
-loadData filePath = do
-    Right bmp <- readBMP filePath
-    return (bmpDimensions bmp, unpackBMPToRGBA32 bmp)
-
-getPixel :: (Int, Int) -> RGBA -> Pixel
-getPixel (x, y) ((w, h), rgba) = (r, g, b) where
-    start = (x + (pred h - y) * w) * 4
-
-    [r, g, b] = take 3 $ map (BSU.unsafeIndex rgba) [start..]
 
 hasData :: Pixel -> Bool
 hasData (r, g, b) = r < 255 || g < 255 || b < 255
 
-takeCellData :: Int -> (Int, Int) -> RGBA -> Cell
-takeCellData cellIndex cellSize rgba = map (\y -> map (\x -> hasData $ getPixel (x, y) rgba) [x1..x2]) [y1..y2] where
+takeCellData :: Int -> RGBA -> Cell
+takeCellData cellIndex rgba = map (\y -> map (\x -> hasData $ getPixel (x, y) rgba) [x1..x2]) [y1..y2] where
     headerHeight = 17
+    cellsInRow = 16
+    cellsInColumn = 6
 
-    cellsInRow = fst (fst rgba) `div` (fst cellSize - 1)
+    (w, h) = fst rgba
+
+    cellWidth = pred w `div` cellsInRow
+    cellHeight = (pred h `div` cellsInColumn) - headerHeight
 
     (cellY, cellX) = cellIndex `divMod` cellsInRow
 
-    x1 = cellX * (fst cellSize - 1)
-    y1 = headerHeight + 1 + cellY * (headerHeight + snd cellSize)
-    x2 = x1 + fst cellSize - 1
-    y2 = y1 + snd cellSize - 1
+    x1 = cellX * cellWidth
+    y1 = headerHeight + 1 + cellY * (headerHeight + cellHeight)
+    x2 = x1 + cellWidth
+    y2 = y1 + cellHeight - 1
 
 packFontData :: Cell -> FontData
 packFontData = BS.pack . loop . concat where
@@ -92,7 +107,6 @@ drawCellData cell = unlines (line : loop cell ++ [line]) where
 
 data Options = Options {
     filePath :: FilePath,
-    cellSize :: (Int, Int),
     fontSize :: (Int, Int),
     fontOffset :: (Int, Int)
 }
@@ -110,7 +124,7 @@ loadFont Options{..} = do
         start = ' '
         chars = [start..'Z']
         header = BS.pack $ map fromIntegral [fst fontSize, snd fontSize, ord start, length chars]
-        charsData = map (\ch -> toFontData $ takeCellData (ord ch - ord start) cellSize rgba) chars
+        charsData = map (\ch -> toFontData $ takeCellData (ord ch - ord start) rgba) chars
 
     return Font {
         fontData = BS.append header $ BS.concat charsData,
@@ -120,6 +134,9 @@ loadFont Options{..} = do
         slice n m = take n . drop m
 
         toFontData = packFontData . slice (snd fontSize) (snd fontOffset) . map (slice (fst fontSize) (fst fontOffset))
+
+stringify :: FontData -> String
+stringify = intercalate "," . map (printf "0x%02X") . BS.unpack
 
 saveFont :: String -> Font -> IO ()
 saveFont fontName Font{..} = do
@@ -144,26 +161,36 @@ saveFont fontName Font{..} = do
 --renderSymbol2 ch rgba = putStrLn $ drawCellData $ takeFontData $ takeCellData (ord ch - 32) rgba
 
 font1 = Options {
-    filePath = "/Users/sergey/Desktop/test-2.bmp",
-    cellSize = (34, 35),
-    fontSize = (16, 24),
-    fontOffset = (8, 5)
-}
-
-font2 = Options {
     filePath = "/Users/sergey/Desktop/test.bmp",
-    cellSize = (42, 43),
     fontSize = (20, 28),
     fontOffset = (10, 7)
 }
 
+font2 = Options {
+    filePath = "/Users/sergey/Desktop/test-2.bmp",
+    fontSize = (16, 24),
+    fontOffset = (8, 5)
+}
+
+font3 = Options {
+    filePath = "/Users/sergey/Desktop/test-3.bmp",
+    fontSize = (16, 22),
+    fontOffset = (7, 5)
+}
+
+font4 = Options {
+    filePath = "/Users/sergey/Desktop/test-4.bmp",
+    fontSize = (14, 20),
+    fontOffset = (6, 4)
+}
+
 main = do
-    font@Font{..} <- loadFont font1
+    font@Font{..} <- loadFont font4
     --renderSymbol2 '0' rgba
     --renderSymbol2 '4' rgba
     --renderSymbol 'W' fontdatatype
 
-    saveFont "SmallCDU" font
+    --saveFont "SmallCDU" font
     renderSymbol '0' fontData
     renderSymbol '4' fontData
     renderSymbol 'V' fontData
