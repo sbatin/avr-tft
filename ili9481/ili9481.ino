@@ -10,7 +10,7 @@ void setup() {
 }
 
 uint8_t x1 = 025;
-uint8_t x2 = 180;
+uint8_t x2 = 183;
 
 #define FONT_SIZE 20
 #define POINT_OFFSET 4
@@ -76,19 +76,19 @@ void loop() {
 
   // standby freq
   myGLCD.setColor(VGA_AQUA);
-  printFrequency(103, 100, 3, x1, 110);
-  printFrequency(109, 300, 3, x1, 270);
-  printFrequency(127, 3, 1, x1, 430);
-  printFrequency(103, 100, 3, x2, 110);
-  printFrequency(109, 300, 3, x2, 270);
-  myGLCD.print("TA/RA", x2, 430);
+  printFrequency(103, 100, 3, x1, 120);
+  printFrequency(109, 300, 3, x1, 280);
+  printFrequency(127, 3, 1, x1, 440);
+  printFrequency(103, 100, 3, x2, 120);
+  printFrequency(109, 300, 3, x2, 280);
+  myGLCD.print("TA/RA", x2, 440);
 
   // selected freq
   myGLCD.setColor(VGA_WHITE);
   myGLCD.setBackColor(VGA_GRAY);
   for (uint16_t i = 113; i < 226; i++) {
     for (uint8_t j = 0; j < 10; j++) {
-      printFrequency(i, j, 1, x1, 430);
+      printFrequency(i, j, 1, x1, 440);
       delay(50);
     }
   }
